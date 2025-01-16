@@ -20,10 +20,37 @@ select name
 from performers p 
 where name not like '% %'
 
--- Название треков, которые содержат слово «мой» или «my», замена на слово «река» или «river»
+/*Доработка запроса*/
+-- Название треков, которые содержат слово «мой» или «my»
+-- Способ 1
 select title 
 from tracks t 
-where lower(title) like '%река%' or lower(title) like 'river%';
+where 
+(title) ilike 'my %'
+or (title) ilike '% my'
+or (title) ilike '% my %'
+or (title) ilike 'my'
+
+-- Название треков, которые содержат слово «мой» или «my»
+-- Способ 2
+select title 
+from tracks t 
+where 
+string_to_array(lower(title), ' ') && ARRAY['my'];
+
+-- Название треков, которые содержат слово «мой» или «my»
+-- Способ 3
+select title 
+from tracks t 
+where 
+lower(title) ILIKE ANY(ARRAY['my %', '% my', '% my %', 'my']);
+
+-- Название треков, которые содержат слово «мой» или «my»
+-- Способ 4
+select title 
+from tracks t 
+where 
+title ~* '(^| )my( |$)'
 
 -- Задание 3
 -- Количество исполнителей в каждом жанре
@@ -33,12 +60,12 @@ join performers_genres pg on g.id = pg.genre_id
 join performers p on pg.performers_id = p.id
 group by g.name;
 
+/*Доработка запроса*/
 -- Количество треков, вошедших в альбомы 2019–2020 годов, меняем на имеющиеся 2003-2017
-select a.title as alboms_name, count(a.id) as track_count
+select count(a.id) as track_count
 from albums a 
 join tracks t on t.album_id = a.id
 where a.year between 2003 and 2017
-group by a.title;
 
 -- Средняя продолжительность треков по каждому альбому
 select a.title as album_name, avg(t.duration) as average_duration
@@ -46,13 +73,17 @@ from albums a
 join tracks t on t.album_id = a.id
 group by a.title;
 
+/*Доработка запроса*/
 -- Все исполнители, которые не выпустили альбомы в 2020 году, меняем на 2010
-select distinct p.name as performer_name, a.title as album_name, a.year as year_f
-from albums a 
-join performers_albums pa on pa.performers_id = a.id
-join performers p on pa.album_id = a.id
-where a."year" <> 2010
-group by p.name, a.title, a.year;
+SELECT distinct name as performer_name /* Получаем имена исполнителей */
+FROM performers p  /* Из таблицы исполнителей */
+WHERE name NOT IN ( /* Где имя исполнителя не входит в вложенную выборку */
+    SELECT name /* Получаем имена исполнителей */
+    FROM performers /* Из таблицы исполнителей */
+    join performers_albums pa on pa.performers_id = p.id /* Объединяем с промежуточной таблицей */
+    JOIN albums a ON a.id = pa.album_id /* Объединяем с таблицей альбомов */
+    WHERE a.year = 2010 /* Где год альбома равен 2020 */
+);
 
 -- Названия сборников, в которых присутствует конкретный исполнитель
 select c.title as collection_name, p.name as perfomer_name
@@ -66,18 +97,23 @@ where p.name = 'Linkin Park'
 group by c.title, p.name;
 
 -- Задание 4
+
+/*Доработка запроса*/
 -- Названия альбомов, в которых присутствуют исполнители более чем одного жанра
 select a.title as album_name
 from albums a
 join performers_albums pa on a.id = pa.album_id
-join performers_genres pg on pa.performers_id = pg.performers_id
-group by a.title
+join performers p on p.id = pa.performers_id 
+join performers_genres pg on p.id = pg.performers_id
+join genres g on g.id = pg.performers_id 
+group by a.title, p.id
 having count(pg.genre_id) > 1;
 
+/*Доработка запроса*/
 -- Наименования треков, которые не входят в сборники
 select t.title as track_name
 from tracks t
-join collections_tracks ct on t.id = ct.track_id
+left join collections_tracks ct on t.id = ct.track_id
 where ct.track_id is null;
 
 -- Исполнитель или исполнители, написавшие самый короткий по продолжительности трек
@@ -102,7 +138,3 @@ with track_counts as (
 select title as album
 from track_counts
 where track_count = (select min(track_count) from track_counts);
-
-
-
-
